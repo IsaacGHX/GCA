@@ -44,8 +44,8 @@ def train_multi_gan(generators, discriminators, dataloaders,
     schedulers = [lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=16, min_lr=1e-7)
                   for optimizer in optimizers_G]
 
-    optimizers_D = [torch.optim.Adam(discriminator.parameters(), lr=d_learning_rate, betas=(0.9, 0.999))
-                    for discriminator in discriminators]
+    optimizers_D = [torch.optim.Adam(model.parameters(), lr=d_learning_rate, betas=(0.9, 0.999))
+                    for model in discriminators]
 
     best_epoch = [-1 for _ in range(N)]  #
 
@@ -124,9 +124,8 @@ def train_multi_gan(generators, discriminators, dataloaders,
             Y.append(y_last.to(device))
 
             for i in range(N):
-                optimizers_D[i].step()
-                discriminators[i].train()
                 generators[i].eval()
+                discriminators[i].train()
 
             loss_D, lossD_G = discriminate_fake(X, Y,
                                                 generators, discriminators,
@@ -150,8 +149,11 @@ def train_multi_gan(generators, discriminators, dataloaders,
 
             # TODO: to see whether there is need to add together
 
-            # for loss in loss_D:
-            #     loss.backward(retain_graph=True)
+            # for i, loss in enumerate(loss_D):
+            #     if i != N - 1:
+            #         loss.backward(retain_graph=True)
+            #     else:
+            #         loss.backward()
 
             loss_D.sum(dim=0).backward()
 
@@ -175,6 +177,11 @@ def train_multi_gan(generators, discriminators, dataloaders,
             for optimizer_G in optimizers_G:
                 optimizer_G.zero_grad()
 
+            # for i, loss in enumerate(loss_G):
+                # if i != N - 1:
+                #     loss.backward(retain_graph=True)
+                # else:
+                #     loss.backward()
             loss_G.sum(dim=0).backward()
 
             for optimizer_G in optimizers_G:
@@ -255,15 +262,15 @@ def train_multi_gan(generators, discriminators, dataloaders,
     plot_discriminator_losses(data_D, output_dir)
 
     # overall G&D
-    visualize_overall_loss(data_G[-1][:], data_D[-1][:], output_dir)
+    visualize_overall_loss(data_G[-1][:][:epoch], data_D[-1][:][:epoch], output_dir)
 
-    # hist_MSE_G = [[] for _ in range(N)]
-    # hist_val_loss = [[] for _ in range(N)]
-    # for i in range(N):
-    #     hist_MSE_G[i] = hists_dict[f"MSE_G{i+1}"]
-    #     hist_val_loss[i] = hists_dict[f"val_G{i+1}"]
-    #
-    # plot_mse_loss(hist_MSE_G, hist_val_loss, epoch, output_dir)
+    hist_MSE_G = [[] for _ in range(N)]
+    hist_val_loss = [[] for _ in range(N)]
+    for i in range(N):
+        hist_MSE_G[i] = hists_dict[f"MSE_G{i+1}"][:epoch]
+        hist_val_loss[i] = hists_dict[f"val_G{i+1}"][:epoch]
+
+    plot_mse_loss(hist_MSE_G, hist_val_loss, epoch, output_dir)
 
     for i in range(N):
         print(f"G{i + 1} best epoch: ", best_epoch[i])
@@ -283,7 +290,7 @@ def discriminate_fake(X, Y,
     N = len(generators)
 
     # discriminator output for real data
-    dis_real_outputs = [discriminator(y) for (discriminator, y) in zip(discriminators, Y)]
+    dis_real_outputs = [model(y) for (model, y) in zip(discriminators, Y)]
     real_labels = [torch.ones_like(dis_real_output).to(device) for dis_real_output in dis_real_outputs]
     fake_data_G = [generator(x) for (generator, x) in zip(generators, X)]  # cannot be omitted
 
@@ -313,7 +320,7 @@ def discriminate_fake(X, Y,
             elif i > j:
                 fake_data_GtoD[f"G{i + 1}ToD{j + 1}"] = fake_data_temp_G[i][:, window_sizes[i] - window_sizes[j]:, :]
             elif i == j:
-                fake_data_GtoD[f"G{i + 1}ToD{j + 1}"] = fake_data_temp_G[i][:, window_sizes[i] - window_sizes[j]:, :]
+                fake_data_GtoD[f"G{i + 1}ToD{j + 1}"] = fake_data_temp_G[i]
 
     fake_labels = [torch.zeros_like(real_label).to(device) for real_label in real_labels]
 
@@ -323,7 +330,8 @@ def discriminate_fake(X, Y,
         for j in range(N):
             out = discriminators[i](fake_data_GtoD[f"G{j + 1}ToD{i + 1}"])
             row.append(out)
-        row.append(lossD_real[i])
+        if mode == "train_D":
+            row.append(lossD_real[i])
         dis_fake_outputD.append(row)  # dis_fake_outputD[i][j] = Di(Gj)
 
     if mode == "train_D":
@@ -347,7 +355,7 @@ def discriminate_fake(X, Y,
     if mode == "train_G":
         loss_mse_G = [F.mse_loss(fake_data.squeeze(), y[:, -1, :].squeeze()) for (fake_data, y) in zip(fake_data_G, Y)]
         loss_matrix = loss_mse_G
-        loss_DorG = loss_DorG + torch.tensor(loss_matrix).to(device)
+        loss_DorG = loss_DorG + torch.stack(loss_matrix).to(device)
 
     return loss_DorG, loss_matrix
 
