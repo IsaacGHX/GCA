@@ -78,8 +78,8 @@ if __name__ == "__main__":
     parser.add_argument('--distill', type=bool, help="Whether to do distillation", default=True)
     parser.add_argument('--device', type=list, help="Device sets", default=[0])
 
-    parser.add_argument('--num_epochs', type=int, help="epoch", default=2)
-    parser.add_argument('--lr', type=int, help="initial learning rate", default=2e-4)
+    parser.add_argument('--num_epochs', type=int, help="epoch", default=1024)
+    parser.add_argument('--lr', type=int, help="initial learning rate", default=5e-5)
     parser.add_argument('--batch_size', type=int, help="Batch size for training", default=64)
     parser.add_argument('--train_split', type=float, help="Train-test split ratio", default=0.8)
     parser.add_argument('--random_seed', type=int, help="Random seed for reproducibility", default=3407)
