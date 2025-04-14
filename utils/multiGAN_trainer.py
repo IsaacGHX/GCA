@@ -111,7 +111,7 @@ def train_multi_gan(generators, discriminators, dataloaders,
         # use the gap the equalize the length of different generators
         gaps = [window_sizes[-1] - window_sizes[i] for i in range(N - 1)]
 
-        for batch_idx, (x_last, y_last) in enumerate(dataloaders[2]):
+        for batch_idx, (x_last, y_last) in enumerate(dataloaders[-1]):
             # TODO: maybe try to random select a gap from the whole time windows
             x_last = x_last.to(device)
             y_last = y_last.to(device)
